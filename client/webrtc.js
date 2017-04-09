@@ -237,8 +237,12 @@ function hangUp(){
         if(peerConnection.iceConnectionState !== 'closed'){
             peerConnection.close();
             peerConnection = null;
+            const message = JSON.stringify({ type: 'close' });
+            console.log('sending close message');
+            ws.send(message);
             cleanupVideoElement(remoteVideo);
             textForSendSdp.value = '';
+            textToReceiveSdp.value = '';
             return;
         }
     }
@@ -288,6 +292,11 @@ ws.onmessage = function(evt) {
         const candidate = new RTCIceCandidate(message.ice);
         console.log(candidate);
         addIceCandidate(candidate);
+    }
+    else if (message.type === 'close') {
+        // closeメッセージ受信時
+        console.log('peer is closed ...');
+        hangUp();
     }
 };
 
