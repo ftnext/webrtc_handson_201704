@@ -83,7 +83,7 @@
       recorder = null;
       playRecorded();
     };
-    
+
     // 録画開始
     recorder.start(1000); // 1000ms 毎に録画データを区切る
   }
@@ -103,6 +103,9 @@
     }
     playbackVideo.src = blobUrl;
     playbackVideo.play();
+
+    anchor.download = 'recorded.webm'; // ファイル名
+    anchor.href = blobUrl; // createObjecURL()で生成したURL
   }
   // ==== (2) 録画 ====
 </script>
