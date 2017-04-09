@@ -2,7 +2,7 @@
 <html>
 <head>
  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
- <title>MeidaRecorder</title>
+ <title>MediaRecorder</title>
 </head>
 <body>
   Recording with Firefox 48 / Camera 53<br />
@@ -35,10 +35,31 @@
   // ==== (1) カメラ映像の取得 ====
   // -- カメラ映像を取得 --
   function startVideo() {
+    navigator.mediaDevices.getUserMedia({video: true, audio: false})
+    .then(function (stream) { // success
+      localStream = stream;
+
+      // videoタグで表示
+      localVideo.srcObject = localStream; // Chrome 53から使える (window.URL.createObjectURLを使わなくても良い)
+    }).catch(function (error) { // error
+      console.error('mediaDevice.getUserMedia() error:', error);
+      return;
+    });
   }
 
   // -- カメラ映像を停止 --
   function stopVideo() {
+    if (localStream) {
+      // track 毎に停止
+      for (const track of localStream.getTracks()) {
+        track.stop();
+      }
+      localStream = null;
+    }
+
+    // videoタグを停止
+    localVideo.pause();
+    localVideo.srcObject = null; // Chrome 53から使える (window.URL.revokeObjectURLを使わなくても良い)
   }
   // ==== (1) カメラ映像の取得 ====
   // ==== (2) 録画 ====
