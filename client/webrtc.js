@@ -52,28 +52,28 @@ function prepareNewConnection() {
     }
 
     // ICE Candidateを収集したときのイベント(Vanilla ICE)
-    peer.onicecandidate = function (evt) {
-        if (evt.candidate) {
-            // Vanilla ICEの場合は何もしない
-            console.log(evt.candidate);
-        } else {
-            // 候補の収集完了(evtの中にcandidateが入ってこなくなった)
-            console.log('empty ice event');
-            sendSdp(peer.localDescription);
-        }
-    };
-
-    // Trickle ICEの場合
     // peer.onicecandidate = function (evt) {
     //     if (evt.candidate) {
-    //         // Trickle ICE の場合は、ICE candidateを相手に送る
+    //         // Vanilla ICEの場合は何もしない
     //         console.log(evt.candidate);
-    //         sendIceCandidate(evt.candidate);
     //     } else {
-    //         // Trickle ICEの場合は何もしない
+    //         // 候補の収集完了(evtの中にcandidateが入ってこなくなった)
     //         console.log('empty ice event');
+    //         sendSdp(peer.localDescription);
     //     }
     // };
+
+    // Trickle ICEの場合
+    peer.onicecandidate = function (evt) {
+        if (evt.candidate) {
+            // Trickle ICE の場合は、ICE candidateを相手に送る
+            console.log(evt.candidate);
+            sendIceCandidate(evt.candidate);
+        } else {
+            // Trickle ICEの場合は何もしない
+            console.log('empty ice event');
+        }
+    };
 
     // ICEのステータスが変更になったときの処理
     peer.oniceconnectionstatechange = function() {
@@ -110,8 +110,12 @@ function sendSdp(sessionDescription) {
     console.log('---sending sdp ---');
     textForSendSdp.value = sessionDescription.sdp;
     // 手動シグナリングでコピペしやすいように
-    textForSendSdp.focus();
-    textForSendSdp.select();
+    // textForSendSdp.focus();
+    // textForSendSdp.select();
+    // 画面上に表示しつつ、wsで相手に送る
+    const message = JSON.stringify(sessionDescription);
+    console.log('sending SDP=' + message);
+    ws.send(message);
 }
 
 // Connectボタンが押されたら処理を開始
@@ -139,6 +143,8 @@ function makeOffer() {
                 return peerConnection.setLocalDescription(sessionDescription);
             }).then(function() {
                 console.log('setLocalDescription() succsess in promise');
+                // Trikle ICE対応用(1つ上のthenでセットした自分のSDPを相手に送る)
+                sendSdp(peerConnection.localDescription);
         }).catch(function(err) {
             console.error(err);
         });
@@ -159,6 +165,8 @@ function makeAnswer() {
             return peerConnection.setLocalDescription(sessionDescription);
         }).then(function() {
             console.log('setLocalDescription() succsess in promise');
+            // Trikle ICE対応用(1つ上のthenでセットした自分のSDPを相手に送る)
+            sendSdp(peerConnection.localDescription);
     }).catch(function(err) {
         console.error(err);
     });
@@ -242,4 +250,62 @@ function hangUp(){
 function cleanupVideoElement(element) {
     element.pause();
     element.srcObject = null;
+}
+
+// シグナリングサーバへ接続する
+// シグナリングサーバへ接続する
+const wsUrl = 'ws://localhost:3001/';
+const ws = new WebSocket(wsUrl);
+// WebSocketサーバと接続確立
+ws.onopen = function(evt) {
+    console.log('ws open()');
+};
+// WebSocketサーバと接続確立できなかった
+ws.onerror = function(err) {
+    console.error('ws onerror() ERR:', err);
+};
+// シグナリングサーバからメッセージを受信した場合(Offerを受けたらOfferを設定/Offerを投げたらAnswerを受信/Candidateの場合)
+ws.onmessage = function(evt) {
+    console.log('ws onmessage() data:', evt.data);
+    const message = JSON.parse(evt.data);
+    if (message.type === 'offer') {
+        // offer 受信時
+        console.log('Received offer ...');
+        textToReceiveSdp.value = message.sdp;
+        const offer = new RTCSessionDescription(message);
+        setOffer(offer);
+    }
+    else if (message.type === 'answer') {
+        // answer 受信時
+        console.log('Received answer ...');
+        textToReceiveSdp.value = message.sdp;
+        const answer = new RTCSessionDescription(message);
+        setAnswer(answer);
+    }
+    else if (message.type === 'candidate') {
+        // ICE candidate 受信時
+        console.log('Received ICE candidate ...');
+        const candidate = new RTCIceCandidate(message.ice);
+        console.log(candidate);
+        addIceCandidate(candidate);
+    }
+};
+
+// ICE candaidate受信時にセットする
+function addIceCandidate(candidate) {
+    if (peerConnection) {
+        peerConnection.addIceCandidate(candidate);
+    }
+    else {
+        console.error('PeerConnection not exist!');
+        return;
+    }
+}
+
+// ICE candidate生成時に送信する
+function sendIceCandidate(candidate) {
+    console.log('---sending ICE candidate ---');
+    const message = JSON.stringify({ type: 'candidate', ice: candidate });
+    console.log('sending candidate=' + message);
+    ws.send(message);
 }
