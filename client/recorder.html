@@ -65,12 +65,44 @@
   // ==== (2) 録画 ====
   // -- 録画開始 --
   function startRecording() {
+    const option = {
+      videoBitsPerSecond : 512000, // 512kbits / sec
+      mimeType : 'video/webm; codecs=vp9'
+    };
+    recorder = new MediaRecorder(localStream, option);
+
+    chunks = []; // 録画データを保持する
+
+    // 一定間隔で録画が区切られて、データが渡される
+    recorder.ondataavailable = function(evt) {
+      chunks.push(evt.data);
+    };
+
+    // 録画停止時に呼ばれる
+    recorder.onstop = function(evt) {
+      recorder = null;
+      playRecorded();
+    };
+    
+    // 録画開始
+    recorder.start(1000); // 1000ms 毎に録画データを区切る
   }
   // -- 録画停止 --
   function stopRecording() {
+    // 録画停止（の要求）
+    recorder.stop();
   }
   // -- 再生 --
   function playRecorded() {
+    const videoBlob = new Blob(chunks, { type: "video/webm" });
+    blobUrl = window.URL.createObjectURL(videoBlob);
+
+    if (playbackVideo.src) {
+      window.URL.revokeObjectURL(playbackVideo.src); // 解放
+      playbackVideo.src = null;
+    }
+    playbackVideo.src = blobUrl;
+    playbackVideo.play();
   }
   // ==== (2) 録画 ====
 </script>
