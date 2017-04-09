@@ -75,6 +75,24 @@ function prepareNewConnection() {
     //     }
     // };
 
+    // ICEのステータスが変更になったときの処理
+    peer.oniceconnectionstatechange = function() {
+        console.log('ICE connection Status has changed to ' + peer.iceConnectionState);
+        switch (peer.iceConnectionState) {
+            case 'closed':
+            case 'failed':
+                // ICEのステートが切断状態または異常状態になったら切断処理を実行する
+                // 再度Offerを送ってもらうしかない状況
+                if (peerConnection) {
+                    hangUp();
+                }
+                break;
+            case 'disconnected':
+                // disconnectedはブラウザ側で再接続を試みる
+                break;
+        }
+    };
+
     // ローカルのストリームを利用できるように準備する
     if (localStream) {
         console.log('Adding local stream...');
@@ -202,4 +220,26 @@ function setAnswer(sessionDescription) {
         }).catch(function(err) {
             console.error('setRemoteDescription(answer) ERROR: ', err);
     });
+}
+
+// P2P通信を切断する
+// 一方が切った場合は他方には映像が残る(電話のように両者が即時切断されない)
+function hangUp(){
+    if (peerConnection) {
+        if(peerConnection.iceConnectionState !== 'closed'){
+            peerConnection.close();
+            peerConnection = null;
+            cleanupVideoElement(remoteVideo);
+            textForSendSdp.value = '';
+            return;
+        }
+    }
+    console.log('peerConnection is closed.');
+
+}
+
+// ビデオエレメントを初期化する
+function cleanupVideoElement(element) {
+    element.pause();
+    element.srcObject = null;
 }
